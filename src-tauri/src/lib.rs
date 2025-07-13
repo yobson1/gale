@@ -23,6 +23,32 @@ mod telemetry;
 mod thunderstore;
 mod util;
 
+fn register_deep_link(app: &mut App, protocol: &str) {
+    // we check if it's registered manually first so we don't duplicate
+    // the MimeType line in the .desktop file on linux
+    if !app
+        .deep_link()
+        .is_registered(protocol)
+        .inspect_err(|err| {
+            warn!(
+                "failed to check if {} deep link protocol is registered: {:#}",
+                protocol, err
+            )
+        })
+        // assume not registered
+        .unwrap_or(false)
+    {
+        if let Err(err) = app.deep_link().register(protocol) {
+            warn!(
+                "failed to register {} deep link protocol: {:#}",
+                protocol, err
+            );
+        }
+    } else {
+        info!("{} deep link protocol is already registered", protocol);
+    }
+}
+
 fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     info!(
         "gale v{} running on {}",
@@ -40,13 +66,8 @@ fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         return Err(err.into());
     }
 
-    if let Err(err) = app.deep_link().register("ror2mm") {
-        warn!("failed to register ror2mm deep link protocol: {:#}", err);
-    }
-
-    if let Err(err) = app.deep_link().register("gale") {
-        warn!("failed to register gale deep link protocol: {:#}", err);
-    }
+    register_deep_link(app, "ror2mm");
+    register_deep_link(app, "gale");
 
     let args = env::args().collect_vec();
     if !args.is_empty() && !deep_link::handle(app.handle(), args.clone()) {
